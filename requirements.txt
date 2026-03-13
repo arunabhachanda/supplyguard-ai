@@ -1,0 +1,38 @@
+# SupplyGuard AI — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# ── Streamlit App ─────────────────────────────────────────────────
+streamlit==1.35.0
+plotly==5.22.0
+pandas==2.2.2
+numpy==1.26.4
+
+# ── ML ────────────────────────────────────────────────────────────
+scikit-learn==1.5.0
+
+# ── LLM ──────────────────────────────────────────────────────────
+anthropic==0.28.0
+
+# ── FastAPI (REST API wrapper) ────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# ── Rate Limiting ─────────────────────────────────────────────────
+slowapi==0.1.9
+
+# ── Security ──────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0    # JWT (for OAuth2 extension)
+passlib[bcrypt]==1.7.4               # password hashing
+python-dotenv==1.0.1                 # .env loading
+
+# ── Data validation ───────────────────────────────────────────────
+pydantic==2.7.4
+
+# ── Real Data Source APIs ─────────────────────────────────────────
+requests==2.32.3              # HTTP client for all external APIs
+textblob==0.18.0              # NLP sentiment analysis for NewsAPI text
+
+# ── Utilities ────────────────────────────────────────────────────
+PyYAML==6.0.1
+
