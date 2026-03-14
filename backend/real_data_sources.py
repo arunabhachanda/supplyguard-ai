@@ -5,7 +5,7 @@ Three genuinely independent signals — each measures a different dimension of r
 
   1. NewsAPI (newsapi.org)
        WHAT: Current news sentiment — "what is happening RIGHT NOW"
-       HOW:  Fetches today's headlines from Reuters/BBC/Bloomberg, runs TextBlob NLP
+       HOW:  Fetches today's headlines from Reuters/BBC/Bloomberg, runs FinBERT NLP
        WHY:  Captures reactive, short-term market sentiment
        FREE: 100 req/day | Needs: NEWS_API_KEY in .env
        EXAMPLE: USA scores negative right now due to tariff/trade dispute headlines
@@ -40,8 +40,7 @@ from datetime import datetime, timedelta
 
 import requests
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from textblob import TextBlob
+from backend.sentiment_model import get_sentiment_scores_batch, get_model_info
 
 from config import cfg
 
@@ -140,7 +139,7 @@ REGION_TO_GDACS_KEYWORDS: Dict[str, List[str]] = {
 def get_news_sentiment(region: str) -> Tuple[float, str]:
     """
     Fetches today's headlines from trusted sources (Reuters, BBC, Bloomberg)
-    and computes TextBlob sentiment polarity.
+    and computes sentiment polarity using fine-tuned SupplyChain FinBERT.
 
     Measures: SHORT-TERM reactive sentiment — what the market feels today.
     Range: -1.0 (very negative) to +1.0 (very positive)
@@ -190,11 +189,23 @@ def get_news_sentiment(region: str) -> Tuple[float, str]:
 
         # Fall back to all articles if none match (global sentiment)
         target_articles = region_articles if region_articles else articles
-        text = " ".join(
-            (a.get("title") or "") + " " + (a.get("description") or "")
+
+        # Build per-article texts for batch inference
+        # FinBERT scores each headline independently then we average —
+        # more accurate than concatenating all text into one string
+        article_texts = [
+            ((a.get("title") or "") + " " + (a.get("description") or "")).strip()
             for a in target_articles
-        )
-        polarity  = float(TextBlob(text).sentiment.polarity)
+            if (a.get("title") or a.get("description"))
+        ]
+
+        if not article_texts:
+            return 0.0, "synthetic (no articles)"
+
+        # Batch inference — FinBERT fine-tuned on supply-chain headlines
+        # Returns polarity scores in [-1.0, +1.0] per article
+        scores    = get_sentiment_scores_batch(article_texts)
+        polarity  = float(np.mean(scores))
         sentiment = round(float(np.clip(polarity, -1.0, 1.0)), 4)
 
         _cache_set(cache_k, sentiment)
@@ -246,7 +257,8 @@ def get_geopolitical_risk(region: str) -> Tuple[float, str]:
     if not country_codes:
         return _SYNTHETIC_GEO_RISK.get(region, 0.5), "synthetic (no countries)"
 
-    def fetch_country_score(iso2: str) -> Optional[float]:
+    scores = []
+    for iso2 in country_codes:
         try:
             url = (
                 f"https://api.worldbank.org/v2/country/{iso2}"
@@ -255,6 +267,8 @@ def get_geopolitical_risk(region: str) -> Tuple[float, str]:
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
             data = resp.json()
+
+            # World Bank returns [metadata, [datapoints]]
             if (
                 isinstance(data, list)
                 and len(data) >= 2
@@ -263,18 +277,12 @@ def get_geopolitical_risk(region: str) -> Tuple[float, str]:
             ):
                 value = data[1][0].get("value")
                 if value is not None:
-                    return float(value)
+                    scores.append(float(value))
+                    logger.info(f"World Bank [{iso2}]: PV.EST = {value:.3f}")
+
         except Exception as e:
             logger.debug(f"World Bank failed for {iso2}: {e}")
-        return None
-
-    scores = []
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(fetch_country_score, iso2): iso2 for iso2 in country_codes}
-        for future in as_completed(futures):
-            result = future.result()
-            if result is not None:
-                scores.append(result)
+            continue
 
     if not scores:
         fallback = _SYNTHETIC_GEO_RISK.get(region, 0.5)

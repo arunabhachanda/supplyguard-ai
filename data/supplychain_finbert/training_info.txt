@@ -1,0 +1,11 @@
+Base model:        ProsusAI/finbert
+Task:              Supply chain sentiment (negative/neutral/positive)
+Dataset size:      40636 samples (~99% real, ~1% synthetic supplement)
+Frozen layers:     BERT embeddings + encoder layers 0-9
+Trainable layers:  Encoder layers 10-11 + pooler + classifier head
+Best val accuracy: 0.6454
+Test accuracy:     0.6393
+Epochs:            4
+Learning rate:     2e-05
+Batch size:        16
+Class weights:     neg=1.459, neu=1.060, pos=0.729

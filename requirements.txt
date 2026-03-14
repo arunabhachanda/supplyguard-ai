@@ -36,3 +36,7 @@ textblob==0.18.0              # NLP sentiment analysis for NewsAPI text
 # ── Utilities ────────────────────────────────────────────────────
 PyYAML==6.0.1
 
+transformers>=4.38.0
+torch>=2.0.0
+huggingface_hub>=0.21.0
+datasets>=2.18.0

@@ -1,10 +1,10 @@
 # 🛡️ SupplyGuard AI — Supply Chain Disruption Risk Intelligence
 
-> **A production-grade ML + LLM platform that scores suppliers on disruption risk,
+> **A production-grade ML + LLM web platform that scores suppliers on disruption risk,
 > explains the drivers, generates AI-powered mitigation strategies, and recommends
 > optimal supply chain rebalancing using linear programming.**
 
-Built with Python · Streamlit · FastAPI · Scikit-learn · Anthropic Claude · Docker · AWS ECS Fargate
+Built with Python · Streamlit · FastAPI · Scikit-learn · FinBERT · Anthropic Claude · SciPy · Docker · AWS ECS Fargate
 
 ---
 
@@ -26,6 +26,7 @@ Built with Python · Streamlit · FastAPI · Scikit-learn · Anthropic Claude ·
 │                 ┌────────▼────────┐                     │
 │                 │   ML Backend    │                     │
 │                 │  - Risk Model   │                     │
+│                 │  - FinBERT NLP  │                     │
 │                 │  - Optimizer    │                     │
 │                 │  - LLM Advisor  │                     │
 │                 │  - Auth / RBAC  │                     │
@@ -44,7 +45,7 @@ Built with Python · Streamlit · FastAPI · Scikit-learn · Anthropic Claude ·
 git clone https://github.com/arunabhachanda/supplyguard-ai.git
 cd supplyguard-ai
 cp .env.example .env
-# Edit .env and add your NEWS_API_KEY and ANTHROPIC_API_KEY
+# Edit .env — add NEWS_API_KEY, ANTHROPIC_API_KEY, HF_FINBERT_REPO
 ```
 
 ### 2. Install dependencies
@@ -80,6 +81,7 @@ docker build -t supplyguard-ai .
 docker run -p 8502:8502 -p 8001:8001 \
   -e ANTHROPIC_API_KEY=your-key \
   -e NEWS_API_KEY=your-key \
+  -e HF_FINBERT_REPO=arunabhachanda/supplychain-finbert \
   -e SECRET_KEY=your-secret-key \
   supplyguard-ai
 ```
@@ -203,26 +205,70 @@ ROLES = {
 |-----------------|--------------------------------------|
 | Algorithm       | GradientBoostingClassifier (sklearn) |
 | Calibration     | Isotonic regression (5-fold CV)      |
+| Task            | Binary classification (disruption risk) |
+| Output          | Calibrated probability [0,1] → High / Medium / Low |
 | Features        | 12 supply chain risk signals         |
-| Training size   | 1,600 synthetic supplier scenarios   |
+| Training size   | 1,280 rows (80% of 1,600 synthetic)  |
+| Test size       | 320 rows (20%)                       |
 | ROC-AUC (test)  | ~0.91                                |
 | F1 Score (test) | ~0.83                                |
 
 ### Feature Engineering
-| Feature                    | Description                              |
-|----------------------------|------------------------------------------|
-| geo_risk_score             | Country geopolitical instability (0–1)   |
-| lead_time_days             | Average supplier lead time               |
-| lead_time_variance         | Std deviation of lead time               |
-| inventory_buffer_days      | Days of safety stock available           |
-| supplier_reliability_score | Historical on-time delivery rate (0–1)   |
-| financial_health_score     | Supplier financial stability (0–1)       |
-| single_source_dependency   | 1 if sole source, 0 otherwise            |
-| region_news_sentiment      | NLP sentiment of regional news (−1 to 1) |
-| natural_disaster_risk      | Regional natural hazard index (0–1)      |
-| past_disruptions_12mo      | Count of disruptions in past 12 months   |
-| regulatory_risk_score      | Trade regulation instability (0–1)       |
-| transport_mode_risk        | Risk factor per transport mode (0–1)     |
+| Feature | Live Mode | Description |
+|---|---|---|
+| `geo_risk_score` | 🟢 World Bank PV.EST | Geopolitical instability [0–1] |
+| `region_news_sentiment` | 🟢 NewsAPI + FinBERT | Headline polarity [−1 to +1] |
+| `natural_disaster_risk` | 🟢 GDACS (UN) | Disaster event score [0–1] |
+| `lead_time_days` | ⚪ Synthetic | Average supplier lead time |
+| `lead_time_variance` | ⚪ Synthetic | Std deviation of lead times |
+| `inventory_buffer_days` | ⚪ Synthetic | Safety stock in days |
+| `supplier_reliability_score` | ⚪ Synthetic | On-time delivery rate [0–1] |
+| `financial_health_score` | ⚪ Synthetic | Supplier solvency [0–1] |
+| `single_source_dependency` | ⚪ Synthetic | 1 if sole source, 0 otherwise |
+| `past_disruptions_12mo` | ⚪ Synthetic | Disruption count, past 12 months |
+| `regulatory_risk_score` | ⚪ Synthetic | Trade regulation instability [0–1] |
+| `transport_mode_risk` | ⚪ Synthetic | Risk by transport mode [0–1] |
+
+🟢 = overwritten by live API in Live Mode · ⚪ = synthetic / user-uploaded CSV
+
+---
+
+## 🤗 FinBERT Sentiment Model
+
+News sentiment is powered by a fine-tuned **SupplyChain FinBERT** model, replacing the original TextBlob lexicon approach.
+
+| Property | Value |
+|---|---|
+| Base model | [ProsusAI/finbert](https://huggingface.co/ProsusAI/finbert) |
+| Fine-tuned on | ~40,600 samples (FinGPT financial sentiment + Twitter Financial News + 70 synthetic geopolitical headlines) |
+| Task | 3-class sentiment: negative / neutral / positive |
+| Strategy | Transfer learning — layers 0–9 frozen, layers 10–11 + head trainable |
+| Test accuracy | 0.64 (2× better than 33% random baseline) |
+| Negative class F1 | 0.79 (most critical class for risk detection) |
+| HuggingFace Hub | [arunabhachanda/supplychain-finbert](https://huggingface.co/arunabhachanda/supplychain-finbert) |
+
+### How sentiment feeds into risk scoring
+
+```
+NewsAPI headlines
+      ↓
+FinBERT → P(negative), P(neutral), P(positive) per article
+      ↓
+polarity = P(positive) - P(negative)  →  [-1.0, +1.0]
+      ↓
+region_news_sentiment updated in supplier DataFrame
+      ↓
+GradientBoosting re-scores all 50 suppliers
+      ↓
+Dashboard shows updated risk scores with LIVE badge
+```
+
+### To fine-tune the model yourself
+```bash
+python build_dataset.py        # downloads ~40K real headlines from HuggingFace
+huggingface-cli login
+python finetune_finbert.py --hf_repo YOUR_USERNAME/supplychain-finbert
+```
 
 ---
 
@@ -230,12 +276,12 @@ ROLES = {
 
 The **Rebalancing** page uses linear programming (`scipy.optimize.linprog`, HiGHS solver) to redistribute purchase volume from high-risk suppliers to low-risk alternatives within the same category.
 
-**Objective:** Minimise portfolio-weighted risk score  
+**Objective:** Minimise portfolio-weighted risk score
 **Constraints:**
 - All demand must be met
 - Each alternative capped at **1.5× their current spend**
 - Total cost must stay within user-defined tolerance (default 20%)
-- Safer suppliers carry a cost premium of up to **+25%** reflecting real-world pricing
+- Safer suppliers carry a cost premium of up to **+25%**
 
 ```
 Minimise:   Σ risk_score[i] × allocation[i]
@@ -245,45 +291,34 @@ Subject to: Σ allocation[i]             = demand
             allocation[i]               ≥ 0
 ```
 
-Results include a before/after risk comparison chart, per-supplier allocation breakdown, and a downloadable rebalancing plan CSV.
-
 ---
 
 ## 🌐 Real Data Sources (Live Mode)
 
-Toggle **Live Data Mode** in the sidebar to replace three synthetic signals with real external APIs. The three signals measure **fundamentally different dimensions of risk** — they are designed to diverge:
+Toggle **Live Data Mode** in the sidebar to replace three synthetic signals with real external APIs:
 
 | Signal | API | What it measures | Key Required |
 |---|---|---|---|
-| **Geopolitical Risk** | [World Bank PV.EST](https://data.worldbank.org) | Structural political stability — long-term institutional risk independent of today's news | No |
-| **News Sentiment** | [NewsAPI](https://newsapi.org) + TextBlob | Current media sentiment — what the market feels right now | Yes — free at newsapi.org |
-| **Disaster Risk** | [GDACS (UN)](https://gdacs.org) | Physical environmental events — earthquakes, floods, cyclones, wildfires (365-day window) | No |
+| **Geopolitical Risk** | [World Bank PV.EST](https://data.worldbank.org) | Structural political stability | No |
+| **News Sentiment** | [NewsAPI](https://newsapi.org) + FinBERT | Current media sentiment (fine-tuned BERT) | Yes — free at newsapi.org |
+| **Disaster Risk** | [GDACS (UN)](https://gdacs.org) | Earthquakes, floods, cyclones, wildfires | No |
 
-### Why three signals instead of one?
-
-Think of it like a doctor checking three different vitals:
+### Doctor analogy
 
 | Signal | Analogy | Example |
 |---|---|---|
-| **World Bank** | Blood pressure history | USA scores LOW despite negative tariff headlines — institutions are stable |
-| **GDACS** | Acute physical injury | Japan scores HIGH despite stable politics — frequent earthquakes and typhoons |
-| **NewsAPI** | Mood today | Saudi Arabia scores LOW (state-filtered media) but World Bank scores MEDIUM-HIGH |
-
-A supplier can score high on one signal and low on another — that divergence is the point. When all three agree (e.g. Yemen: high on all three), the risk is unambiguous.
+| **World Bank** | Blood pressure history | USA LOW despite negative tariff headlines — institutions are stable |
+| **GDACS** | Acute physical injury | Japan HIGH despite stable politics — frequent earthquakes and typhoons |
+| **NewsAPI + FinBERT** | Mood today | Saudi Arabia LOW (state-filtered media) but World Bank MEDIUM-HIGH |
 
 ### How to activate Live Mode
 
-1. Register for [NewsAPI](https://newsapi.org/register) — instant, free
-2. Add your key to `.env`:
+Add to `.env`:
 ```
 NEWS_API_KEY=your-newsapi-key
+HF_FINBERT_REPO=arunabhachanda/supplychain-finbert
 ```
-3. Restart the app → toggle **🌐 Live Data Mode** in the sidebar
-
-World Bank and GDACS require no registration or API keys.
-
-### Fallback behaviour
-If any live API call fails (rate limit, network error, no key), the platform **automatically falls back to the synthetic baseline** and logs the reason. The app never crashes due to a missing API key.
+Then restart and toggle **🌐 Live Data Mode** in the sidebar. World Bank and GDACS need no keys.
 
 ---
 
@@ -328,15 +363,21 @@ supplyguard-ai/
 ├── page_rebalancing.py       # Supply rebalancing optimizer UI
 ├── fastapi_wrapper.py        # REST API (FastAPI + Pydantic)
 ├── config.py                 # Centralised configuration
+├── build_dataset.py          # FinBERT training data builder (~40K real samples)
+├── finetune_finbert.py       # FinBERT fine-tuning + HuggingFace Hub push
+├── fix_push_readme.py        # HuggingFace model card updater
 ├── requirements.txt
 ├── Dockerfile
 ├── .env.example
+├── data/
+│   └── supplychain_finbert/  # Fine-tuned model weights (local cache)
 ├── backend/
 │   ├── __init__.py
-│   ├── data_generator.py     # Synthetic data + feature definitions
-│   ├── risk_model.py         # ML model + SHAP explainability
-│   ├── optimizer.py          # Linear programming rebalancing engine
-│   ├── real_data_sources.py  # World Bank + NewsAPI + GDACS integrations
+│   ├── data_generator.py     # Synthetic supplier data (50 display + 1,600 training rows)
+│   ├── risk_model.py         # GradientBoosting + isotonic calibration
+│   ├── sentiment_model.py    # FinBERT inference wrapper + TextBlob fallback
+│   ├── optimizer.py          # LP rebalancing engine (scipy HiGHS)
+│   ├── real_data_sources.py  # World Bank + NewsAPI/FinBERT + GDACS integrations
 │   ├── llm_advisor.py        # Anthropic Claude LLM integration
 │   └── auth.py               # Session auth + RBAC
 ├── docker/
@@ -350,15 +391,17 @@ supplyguard-ai/
 
 ## 🏆 Key Technical Highlights
 
-- Built end-to-end ML platform combining **Gradient Boosting + LLM** for supply chain risk
-- Implemented **linear programming optimizer** (scipy HiGHS) for risk-first supply rebalancing
-- Integrated **3 independent real-time signals** (World Bank, NewsAPI, GDACS) with 1-hour caching
-- Implemented **RBAC, brute-force protection, rate limiting, and input validation** in Python
-- Containerised with Docker, deployed on **AWS ECS Fargate** behind an **ALB with HTTPS**
-- Secrets managed via **AWS Secrets Manager** (zero secrets in code)
-- Exposed as both a Streamlit web app and **REST API** (FastAPI + Pydantic)
-- SHAP-style feature explanations for **interpretable ML** decisions
+- **Full-stack ML web app** (Streamlit + FastAPI) built in direct response to real-world supply chain crises — Ukraine war, Red Sea disruptions, Iran sanctions
+- **Transfer Learning + Fine-tuning**: adapted ProsusAI/FinBERT on ~40K real financial headlines for supply-chain NLP sentiment; model published to [HuggingFace Hub](https://huggingface.co/arunabhachanda/supplychain-finbert)
+- **Binary classification** (GradientBoosting + isotonic calibration, ROC-AUC ~0.91) with 3-signal live data enrichment replacing 3 of 12 input features in real time
+- **Linear programming optimizer** (scipy HiGHS) for risk-first supply rebalancing — up to 81% risk reduction within cost tolerance
+- **3 independent real-time signals** (World Bank PV.EST, NewsAPI + FinBERT, UN GDACS) with 1-hour in-process caching and graceful fallback
+- **RBAC, brute-force protection, rate limiting, input validation** — production-grade security layer
+- Containerised with Docker, deployed on **AWS ECS Fargate** behind an **ALB with HTTPS/TLS 1.3**
+- Secrets managed via **AWS Secrets Manager** — zero secrets in code, image, or CloudFormation
+- **Anthropic Claude LLM** for structured JSON mitigation recommendations and executive portfolio briefs
 
 ---
 
 *Built by Arunabha Kumar Chanda — M.Sc. Business Intelligence & Data Science, ISM Munich*
+*GitHub: [arunabhachanda](https://github.com/arunabhachanda) · HuggingFace: [arunabhachanda](https://huggingface.co/arunabhachanda)*

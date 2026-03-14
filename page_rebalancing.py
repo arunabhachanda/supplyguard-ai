@@ -288,6 +288,29 @@ def render_rebalancing_page(df: pd.DataFrame):
 
     # ── Run optimization ─────────────────────────────────────────
     if st.button("🚀 Run Optimization", type="primary"):
+        # Pre-run validation
+        n_sources = len(df[df["risk_score"] >= risk_threshold_source]) if "risk_score" in df.columns else 0
+        n_targets = len(df[df["risk_score"] <= risk_threshold_target]) if "risk_score" in df.columns else 0
+
+        if n_sources == 0:
+            st.warning(
+                f"⚠️ No suppliers have risk ≥ {risk_threshold_source:.2f}. "
+                "Try lowering the **'Rebalance suppliers with risk ≥'** slider."
+            )
+            st.stop()
+        elif n_targets == 0:
+            st.error(
+                f"🚫 No suppliers qualify as alternatives at risk ≤ {risk_threshold_target:.2f}. "
+                "Try **raising** the **'Use alternatives with risk ≤'** slider."
+            )
+            st.stop()
+        elif n_targets < 3:
+            st.warning(
+                f"⚠️ Only **{n_targets} supplier(s)** qualify as alternatives at "
+                f"risk ≤ {risk_threshold_target:.2f}. Consider raising this threshold "
+                "for more realistic results."
+            )
+
         optimizer = SupplyChainOptimizer(
             risk_threshold_source=risk_threshold_source,
             risk_threshold_target=risk_threshold_target,
@@ -350,18 +373,51 @@ def render_rebalancing_page(df: pd.DataFrame):
     p1.metric("Categories Affected", len(cat_results))
     p2.metric("Suppliers to Rebalance", n_sources)
     p3.metric("Total Demand", _fmt_usd(total_demand))
+    # Risk reduction clamped to [0, 100]
+    risk_red_pct = max(0.0, min(100.0,
+        ((avg_orig_risk - avg_new_risk) / avg_orig_risk * 100) if avg_orig_risk > 0 else 0.0
+    ))
+
+    # Cost delta — apples to apples: premium paid on COVERED demand only
+    # Avoids negative cost from partial coverage (covered < full = looks like savings)
+    total_unmet   = sum(r.unmet_demand for r in
+                        [rr for res in cat_results.values() for rr in res.reallocation_results])
+    total_covered = max(total_demand - total_unmet, 0.0)
+    cost_delta_pct = ((total_new_cost - total_covered) / total_covered * 100) if total_covered > 0 else 0.0
+    cost_delta_pct = max(-5.0, min(30.0, cost_delta_pct))   # safety premium range: 0-25%
+
     p4.metric(
         "Avg Risk Reduction",
-        f"{((avg_orig_risk - avg_new_risk) / avg_orig_risk * 100):.1f}%",
+        f"{risk_red_pct:.1f}%",
         delta="improvement",
         delta_color="inverse",
     )
     p5.metric(
         "Cost Impact",
-        f"{((total_new_cost - total_orig_cost) / total_orig_cost * 100) if total_orig_cost > 0 else 0:+.1f}%",
-        delta="vs original spend",
+        f"{cost_delta_pct:+.1f}%",
+        delta="safety premium on covered",
         delta_color="inverse",
     )
+
+    # Unmet demand row — shown only when partial coverage
+    total_unmet_display = sum(
+        r.unmet_demand
+        for res in cat_results.values()
+        for r in res.reallocation_results
+    )
+    if total_unmet_display > total_demand * 0.01:
+        coverage_pct = (1 - total_unmet_display / total_demand) * 100 if total_demand > 0 else 0
+        st.warning(
+            f"⚠️ **{coverage_pct:.1f}% demand covered** "
+            f"({_fmt_usd(total_demand - total_unmet_display)} of {_fmt_usd(total_demand)}). "
+            f"**{_fmt_usd(total_unmet_display)} unmet** — alternative suppliers are at "
+            f"physical capacity (1.5× cap). To cover more: "
+            f"(1) raise the **'Use alternatives with risk ≤'** slider to include "
+            f"more suppliers, or (2) raise the **'Max Cost Increase'** slider to allow "
+            f"higher-premium alternatives."
+        )
+    else:
+        st.success(f"✅ **100% demand covered** across all {len(cat_results)} categories.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -383,6 +439,20 @@ def render_rebalancing_page(df: pd.DataFrame):
         legend=dict(bgcolor="rgba(0,0,0,0)"),
     )
     st.plotly_chart(fig_ba, use_container_width=True, config={"displayModeBar": False})
+
+    # Contextual messages
+    if risk_red_pct >= 90.0:
+        st.info(
+            f"ℹ️ **{risk_red_pct:.1f}% risk reduction** means demand was successfully shifted "
+            "to very low-risk alternatives. Check the allocation table below to confirm "
+            "the supplier pool is realistic."
+        )
+    if cost_delta_pct > 20.0:
+        st.warning(
+            f"⚠️ **Cost impact is {cost_delta_pct:.1f}%** — above the 20% guideline. "
+            "This typically means few alternatives are available, forcing concentration "
+            "in high-premium suppliers. Consider raising the cost tolerance slider."
+        )
 
     st.markdown("---")
 

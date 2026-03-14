@@ -32,3 +32,28 @@ test_gdelt.py
 # Logs
 *.log
 .claude/
+
+
+# FinBERT model weights — stored on HuggingFace Hub, not Git
+data/best_model_state.pt
+data/supplychain_finbert/model.safetensors
+
+# Training dataset — regenerate with: python build_dataset.py
+data/supplychain_headlines.csv
+
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment secrets — NEVER commit
+.env
+
+# Mac system files
+.DS_Store
+
+# Streamlit cache
+.streamlit/secrets.toml
