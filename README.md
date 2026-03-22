@@ -1,10 +1,152 @@
 # 🛡️ SupplyGuard AI — Supply Chain Disruption Risk Intelligence
 
-> **A production-grade ML + LLM web platform that scores suppliers on disruption risk,
-> explains the drivers, generates AI-powered mitigation strategies, and recommends
-> optimal supply chain rebalancing using linear programming.**
+### Real-Time Risk Scoring · LP Rebalancing Optimizer · FinBERT NLP · LLM-Powered Mitigation
 
-Built with Python · Streamlit · FastAPI · Scikit-learn · FinBERT · Anthropic Claude · SciPy · Docker · AWS ECS Fargate
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.x-red?logo=streamlit)](https://streamlit.io)
+[![FastAPI](https://img.shields.io/badge/FastAPI-latest-green?logo=fastapi)](https://fastapi.tiangolo.com)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange?logo=pytorch)](https://pytorch.org)
+[![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-latest-blue?logo=scikit-learn)](https://scikit-learn.org)
+[![HuggingFace](https://img.shields.io/badge/HuggingFace-FinBERT-yellow?logo=huggingface)](https://huggingface.co/arunabhachanda/supplychain-finbert)
+[![AWS](https://img.shields.io/badge/AWS-ECS%20Fargate-orange?logo=amazonaws)](https://aws.amazon.com)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+---
+
+## 🚨 The Problem This Project Solves
+
+Every year, **global supply chain disruptions cost companies over $4 trillion in lost revenue**, delayed production, and emergency procurement. The Ukraine war cut off neon gas supplies critical to semiconductor manufacturing. Red Sea attacks forced container ships onto 14-day detours. Iran sanctions locked companies out of critical energy component suppliers overnight. These aren't rare events — they are the new normal.
+
+Traditional procurement teams are flying blind:
+
+| Approach | Problem | Cost |
+|---|---|---|
+| **Reactive** | Wait for supplier failure, then scramble | Highest — production halts, panic buying at inflated prices |
+| **Spreadsheet-based** | Manual risk reviews quarterly, subjective scores | Outdated the moment geopolitics shift |
+| **Single-signal monitoring** | Monitor news OR political risk OR disasters — not all three | Each signal has major blind spots — they must be read together |
+| **Predictive ✅** | Score every supplier continuously, flag risk before it materialises | Lowest — targeted, timely, data-driven action |
+
+**SupplyGuard AI builds a complete, production-grade supply chain risk intelligence platform** — going beyond simply flagging which suppliers are risky, to automatically computing the optimal redistribution of procurement spend across safer alternatives, enforcing real-world constraints that make the recommendations actually actionable.
+
+---
+
+## 🎯 Project Overview
+
+This is a **full-stack ML + LLM platform** that mirrors how enterprise supply chain risk systems are architected at global companies:
+
+```
+50 Global Suppliers × 12 Risk Features
+              │
+              ▼
+┌─────────────────────────────┐
+│   3 LIVE SIGNAL INGESTION   │  ── World Bank PV.EST (political stability)
+│   Real-Time Data Pipeline   │     NewsAPI + FinBERT NLP (news sentiment)
+│                             │     UN GDACS (disaster alerts)
+└──────────────┬──────────────┘
+               │ 3 features overwritten with live values
+               ▼
+┌─────────────────────────────┐
+│   ML RISK SCORING           │  ── GradientBoosting + Isotonic Calibration
+│   Binary Classification     │     ROC-AUC: 0.91 | F1: 0.83
+│                             │     Output: risk_score [0,1] → High/Med/Low
+└──────────────┬──────────────┘
+               │ High-risk suppliers flagged
+               ▼
+┌─────────────────────────────┐
+│   LP REBALANCING OPTIMIZER  │  ── scipy HiGHS solver
+│   Risk-First Linear         │     7 real-world constraints enforced
+│   Programming               │     Up to 81% risk reduction, 0-25% cost delta
+└──────────────┬──────────────┘
+               │ Optimal allocation computed
+               ▼
+┌─────────────────────────────┐
+│   LLM MITIGATION ADVISOR    │  ── Anthropic Claude
+│   Structured JSON Output    │     Per-supplier action plans
+│                             │     Executive portfolio brief
+└─────────────────────────────┘
+```
+
+---
+
+## 🌍 Real-World Industry Impact
+
+### 🏭 Manufacturing — Bosch / Siemens / Continental
+
+Global manufacturers source critical components — semiconductors, rare earth minerals, automotive parts — from suppliers across geopolitically volatile regions. A single tier-1 supplier failure in a conflict zone can halt an entire production line.
+
+**With SupplyGuard AI:**
+- Live World Bank and GDACS signals flag suppliers in conflict zones (Yemen, Libya, Afghanistan) before they become operational crises
+- The LP optimizer automatically reallocates spend to safer regional alternatives within the same category
+- Procurement teams receive board-ready mitigation briefs in seconds, not days
+
+### ⚡ Energy & Utilities — E.ON / RWE / Vattenfall
+
+Energy companies rely on complex global supply chains for turbine components, electrical infrastructure, and fuel processing equipment — many sourced from sanctions-exposed regions (Iran, Russia) or disaster-prone zones (Southeast Asia typhoon belt).
+
+**With SupplyGuard AI:**
+- Iran sanctions exposure flagged immediately via World Bank political stability scores
+- Geographic diversification constraint (max 65% from any one region) prevents over-reliance on Middle East suppliers
+- Cost impact of moving to safer European suppliers is quantified precisely — not estimated
+
+### 🚗 Automotive — BMW / Mercedes-Benz / Volkswagen
+
+Automotive supply chains are among the world's most complex, spanning thousands of tier-1 through tier-3 suppliers across every continent. A single missing component — a $5 chip, a specific alloy — can halt a production line costing €1M+ per hour.
+
+**With SupplyGuard AI:**
+- Three independent signals catch different risk dimensions: political instability, current news events, and physical disasters — each can trigger independently
+- Lead time filter (alternatives must have lead time ≤ 2× source) ensures the rebalancing plan is operationally feasible, not just mathematically optimal
+- *(This connects directly to my experience building vehicle testing data infrastructure at Mercedes-Benz R&D via Capgemini)*
+
+### 🛒 Retail & E-Commerce — Zalando / Otto / About You
+
+Retailers sourcing textiles, electronics, and consumer goods from Southeast Asia, Bangladesh, and sub-Saharan Africa face constant exposure to typhoons, flooding, political instability, and regulatory shifts.
+
+**With SupplyGuard AI:**
+- GDACS disaster risk scores alert buyers to typhoon and flood events near supplier manufacturing clusters before shipments are disrupted
+- Single-source dependency flag (Bernoulli feature) immediately highlights which suppliers have zero alternatives — the highest-priority risk
+- Supplier reliability filter ensures rebalancing recommendations only include alternatives with ≥ 60% on-time delivery track record
+
+### 💊 Pharmaceuticals — Bayer / Merck / Fresenius
+
+Pharmaceutical supply chains have zero tolerance for disruption — API (Active Pharmaceutical Ingredient) shortages directly affect patient safety. Most APIs are sourced from India and China, creating extreme geographic concentration risk.
+
+**With SupplyGuard AI:**
+- Geographic concentration constraint (max 65% from any one region) directly addresses the India/China API concentration problem
+- Concentration cap (max 60% from any one alternative) prevents creating new single-source dependencies during rebalancing
+- All constraints are configurable per procurement policy — tighter limits for critical medicines, looser for commodity items
+
+---
+
+## ⚖️ How the Rebalancing Optimizer Works — and Why It's Different
+
+Most supply chain tools stop at flagging risk. SupplyGuard AI answers the harder question: **what exactly should we do about it?**
+
+The rebalancing engine solves a **risk-first Linear Programming problem** — it minimises the portfolio-weighted risk score while enforcing seven real-world constraints that make the output actually usable by a procurement team:
+
+```
+Minimise:   Σ risk_score[i] × allocation[i]                    ← risk objective
+
+Subject to:
+  Σ allocation[i]                     = demand                 ← 100% demand must be met
+  Σ safety_premium[i] × allocation[i] ≤ demand × (1+tolerance) ← cost budget [USD]
+  allocation[i]                       ≤ 1.5 × current_spend[i] ← capacity (1.5× cap)
+  allocation[i]                       ≤ demand × 0.60          ← no new single-source dependency
+  Σ allocation[i in region r]         ≤ demand × 0.65          ← geographic diversification
+  lead_time[i]                        ≤ source_lead_time × 2.0 ← operationally feasible
+  reliability[i]                      ≥ 0.60                   ← only trustworthy alternatives
+```
+
+**Safety premium** — safer suppliers cost more. This is modelled explicitly:
+
+```
+effective_cost[i] = allocation[i] × (1 + (1 − risk_score[i]) × 0.25)
+```
+
+A supplier with risk_score = 0.10 costs 22.5% more per unit than a high-risk supplier. The optimizer finds the allocation that minimises risk subject to this realistic cost structure — never producing the naive answer of "just buy from the safest supplier regardless of cost."
+
+**Shared capacity pool** — all source suppliers in a category compete for the same target supplier capacity. The highest-risk source gets first pick. This prevents the common LP bug where multiple sources independently allocate to the same target, over-subscribing its physical capacity.
+
+**Two-pass greedy fallback** — if the LP is infeasible (too few alternatives at the threshold), a two-pass greedy algorithm runs: Pass 1 respects all constraints, Pass 2 uses remaining budget headroom to cover any unmet demand, relaxing the concentration cap. The principle: if budget remains, use it to cover demand.
 
 ---
 
