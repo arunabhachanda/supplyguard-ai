@@ -232,7 +232,7 @@ def get_news_sentiment(region: str) -> Tuple[float, str]:
 def get_geopolitical_risk(region: str) -> Tuple[float, str]:
     """
     Fetches the World Bank Political Stability and Absence of Violence
-    indicator (PV.EST) for representative countries in the region.
+    indicator (GOV_WGI_PV.EST) for representative countries in the region.
 
     Measures: STRUCTURAL, LONG-TERM political risk — how stable the system
     itself is, independent of today's news cycle.
@@ -262,7 +262,7 @@ def get_geopolitical_risk(region: str) -> Tuple[float, str]:
         try:
             url = (
                 f"https://api.worldbank.org/v2/country/{iso2}"
-                f"/indicator/PV.EST?format=json&mrv=1&per_page=1"
+                f"/indicator/GOV_WGI_PV.EST?format=json&mrv=1&per_page=1"
             )
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
